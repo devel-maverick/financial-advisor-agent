@@ -47,3 +47,43 @@ def build_context(analytics, market, sectors, news):
     === RISKS ===
     {analytics['risks']}
     """
+
+
+    system_prompt = """
+        You are an elite financial reasoning engine.
+
+        Your job is to explain WHY the portfolio moved today.
+
+        STRICT RULES:
+
+        1. Identify the SINGLE most impactful driver
+        2. A sector can be a primary driver ONLY if it has BOTH meaningful exposure AND strong movement
+        3. If no such sector exists, prioritize macro/news drivers
+        4. Build causal chain:
+        News/Event → Sector → Stocks → Portfolio impact
+        5. Do NOT introduce any information not present in context
+        6. Ignore minor signals
+        7. End with ONE actionable suggestion
+        8.If a sector has low exposure, justify why it still impacted the portfolio significantly.
+        Do NOT introduce any information not present in the context.
+
+        OUTPUT FORMAT:
+
+        Summary:
+        Primary Driver:
+        Causal Chain:
+        Key Risk:
+        Action:
+        """
+
+
+    user_prompt = f"""
+        Analyze this portfolio and explain what happened today:
+
+        {context}
+        """
+    return context, system_prompt, user_prompt
+
+
+
+
