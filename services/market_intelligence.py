@@ -39,7 +39,27 @@ class MarketIntelligence:
                 "key_drivers":data.get('key_drivers',[])
             }
         return sector_trend
-    
+
+    def analyze_relevant_news(self,portfolio_sectors,portfolio_stocks):
+        news=self.loader.get_news_data()
+        important_news=[]
+        for n in news:
+            entities=n.get("entities",{})
+            news_sectors=entities.get("sectors",[])
+            news_stocks=entities.get("stocks",[])
+            scope=n.get("scope","")
+            impact=n.get("impact_level","")
+            if scope=="MARKET_WIDE" and impact in ["HIGH","MEDIUM"]:
+                important_news.append(n)
+            elif any(sec in portfolio_sectors for sec in news_sectors) or any(stock in portfolio_stocks for stock in news_stocks):
+                important_news.append(n)
+        impact_level={"HIGH":0,"MEDIUM":1,"LOW":2}
+        important_news.sort(key=lambda x: (impact_level.get(x.get("impact_level"),3),-abs(x.get("sentiment_score",0))))
+        return important_news[:7]
+
+
+
+
 
 
 
