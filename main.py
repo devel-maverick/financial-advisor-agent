@@ -84,6 +84,25 @@ def build_context(analytics, market, sectors, news):
         """
     return context, system_prompt, user_prompt
 
+def run(portfolio_id: str):
+    loader=DataLoader("data")
+    portfolio_engine = PortfolioAnalytics(loader)
+    analytics = portfolio_engine.portfolio_analytics(portfolio_id)
+    market_engine = MarketIntelligence(loader)
+    market = market_engine.analyze_market_sentiment()
+    sectors = market_engine.analyze_sector_performance()
+    portfolio_sectors = list(analytics["sector_allocation_percent"].keys())
+    portfolio_stocks = [s["symbol"] for s in analytics["top_gainers"]] + [s["symbol"] for s in analytics["top_losers"]]
+    news = market_engine.analyze_relevant_news(portfolio_sectors, portfolio_stocks)
+    context, system_prompt, user_prompt = build_context(analytics,market,sectors,news)
+    agent=Agent()
+    result=agent.analyze(system_prompt,user_prompt)
+    print("\n====== FINAL ANALYSIS ======\n")
+    print(result)
+    return result
+
+if __name__ == "__main__":
+    run("PORTFOLIO_001")
 
 
 
