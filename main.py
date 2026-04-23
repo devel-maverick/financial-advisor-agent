@@ -102,8 +102,12 @@ def build_context(analytics, market, sectors, news):
         1. Identify the SINGLE most impactful driver
         2. A sector can be a primary driver ONLY if it has BOTH meaningful exposure AND strong movement
         3. If no such sector exists, prioritize macro/news drivers
-        4. Build causal chain:
-        News/Event → Sector → Stocks → Portfolio impact
+        4. Build a step-by-step causal chain. Each step on a new line starting with a dash and ONE of these exact prefixes:
+           [NEWS] for the triggering news/event
+           [SECTOR] for sector-level impact
+           [STOCK] for individual stock impact
+           [PORTFOLIO] for final portfolio impact
+           Example: - [NEWS] RBI holds rate steady → - [SECTOR] Banking fell -2.45% → - [STOCK] HDFCBANK -3.51% → - [PORTFOLIO] Portfolio lost -2.81%
         5. Do NOT introduce any information not present in context
         6. Ignore minor signals
         7. End with ONE actionable suggestion
@@ -153,7 +157,7 @@ def run(portfolio_id: str):
     return result
 
 if __name__ == "__main__":
-    run("PORTFOLIO_002")
+    run("PORTFOLIO_001")
     langfuse.flush()  # ensure all traces are sent before program exits
 
 
