@@ -1,7 +1,11 @@
+from dotenv import load_dotenv
+load_dotenv(override=True)
+
 from services.data_loader import DataLoader
 from services.portfolio_analytics import PortfolioAnalytics
 from services.market_intelligence import MarketIntelligence
 from agent.financial_agent import Agent
+from services.langfuse import langfuse
 # from services.evaluator import evaluate_response
 # from services.logger import log
 
@@ -66,6 +70,7 @@ def build_context(analytics, market, sectors, news):
         7. End with ONE actionable suggestion
         8.If a sector has low exposure, justify why it still impacted the portfolio significantly.
         Do NOT introduce any information not present in the context.
+        9.Use specific numbers (% change, exposure, PnL) wherever possible.
 
         OUTPUT FORMAT:
 
@@ -96,13 +101,14 @@ def run(portfolio_id: str):
     news = market_engine.analyze_relevant_news(portfolio_sectors, portfolio_stocks)
     context, system_prompt, user_prompt = build_context(analytics,market,sectors,news)
     agent=Agent()
-    result=agent.analyze(system_prompt,user_prompt)
+    result=agent.analyze(user_prompt,system_prompt)
     print("\n====== FINAL ANALYSIS ======\n")
     print(result)
     return result
 
 if __name__ == "__main__":
-    run("PORTFOLIO_001")
+    run("PORTFOLIO_002")
+    langfuse.flush()  # ensure all traces are sent before program exits
 
 
 
