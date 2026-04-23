@@ -20,12 +20,42 @@ def build_context(analytics, market, sectors, news):
     negative_sectors="\n".join(f"{sec}: {data['change_percent']}%" for sec,data in sectors.items() if data['change_percent']<0)
 
     top_news_line = "\n".join(
-    f"[{n['impact_level']}] {n.get('headline','No Headline')} | "
-    f"Factors: {', '.join(n.get('causal_factors', [])[:2])}"
-    for n in news
-    if n['impact_level'] == "HIGH"
-)
-    top_news_line=top_news_line or "No major news"
+        f"[{n['impact_level']}] {n.get('headline','No Headline')} | "
+        f"Factors: {', '.join(n.get('causal_factors', [])[:2])}"
+        for n in news
+        if n['impact_level'] in ["HIGH", "MEDIUM"]
+    )
+    top_news_line = top_news_line or "No major news"
+
+    #imp: Edge case and conflicting signal handling
+
+    # case1: Positive news + Negative price action
+    case1 = []
+    for n in news:
+        for stock in analytics.get('stocks', []):
+            if stock['symbol'] in n.get('entities', {}).get('stocks', []):
+                if n.get('sentiment_score', 0) > 0.3 and stock.get('day_change_percent', 0) < 0:
+                    case1.append(f"{stock['symbol']}: positive news (score {n['sentiment_score']:+.2f}) but fell {stock['day_change_percent']:.2f}% — sector/macro overrode stock news")
+    case1_lines = "\n".join(case1) or "None detected"
+
+    # case2: Sector vs Stock divergence
+    case2 = []
+    for stock in analytics.get('stocks', []):
+        sector_chg = sectors.get(stock.get('sector',''), {}).get('change_percent', 0)
+        stock_chg = stock.get('day_change_percent', 0)
+        if sector_chg < -0.5 and stock_chg > 0.3:
+            case2.append(f"{stock['symbol']} +{stock_chg:.2f}% vs {stock['sector']} {sector_chg:.2f}% — indicating stock-specific factors performed better than sector")
+        elif sector_chg > 0.5 and stock_chg < -0.3:
+            case2.append(f"{stock['symbol']} {stock_chg:.2f}% vs {stock['sector']} +{sector_chg:.2f}% — indication stock underperformance despite positive sector momentum")
+    case2_lines = "\n".join(case2) or "None detected"
+
+    # case3: Mixed signals(unclear news)
+    case3 = []
+    for n in news:
+        score = n.get('sentiment_score', 0)
+        if -0.2 <= score <= 0.2 and n.get('impact_level') in ['HIGH', 'MEDIUM']:
+            case3.append(f"{n.get('headline','')} (score {score:+.2f}) — unclear news — ambiguous signal with mixed positive and negative factors")
+    case3_lines = "\n".join(case3) or "None detected"
 
     context = f"""
     === PORTFOLIO ===
@@ -50,6 +80,15 @@ def build_context(analytics, market, sectors, news):
 
     === RISKS ===
     {analytics['risks']}
+
+    === EDGECASE1: Positive News + Negative Price ===
+    {case1_lines}
+
+    === EDGECASE2: Stock vs Sector Divergence ===
+    {case2_lines}
+
+    === EDGECASE3: Mixed Ambiguous Signals ===
+    {case3_lines}
     """
 
 
@@ -69,14 +108,21 @@ def build_context(analytics, market, sectors, news):
         6. Ignore minor signals
         7. End with ONE actionable suggestion
         8.If a sector has low exposure, justify why it still impacted the portfolio significantly.
-        Do NOT introduce any information not present in the context.
         9.Use specific numbers (% change, exposure, PnL) wherever possible.
+        10.Only consider sectors with significant exposure (>10%) as primary drivers.
+            Avoid attributing major impact to low-weight sectors.
+        11. If you see conflicting signals, clearly state which one dominated the outcome and explain why the other was overridden.
+        12. If a stock had positive news but still fell — don't skip this. Explain that sector-wide or macro pressure was stronger than the stock-specific good news.
+        13. If a stock moved against its sector (e.g., stock up while sector is down), flag it as a divergence and identify the specific reason driving that stock independently.
+        14. If any news has a sentiment score close to zero, treat it as ambiguous — acknowledge both sides briefly and avoid leaning positive or negative without evidence.
 
-        OUTPUT FORMAT:
+
+        OUTPUT FORMAT (use exactly these headers):
 
         Summary:
         Primary Driver:
         Causal Chain:
+        Conflicting Signals:
         Key Risk:
         Action:
         """
@@ -109,6 +155,5 @@ def run(portfolio_id: str):
 if __name__ == "__main__":
     run("PORTFOLIO_002")
     langfuse.flush()  # ensure all traces are sent before program exits
-
 
 
