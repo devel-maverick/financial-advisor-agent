@@ -6,11 +6,10 @@ from services.portfolio_analytics import PortfolioAnalytics
 from services.market_intelligence import MarketIntelligence
 from agent.financial_agent import Agent
 from services.langfuse import langfuse
-# from services.evaluator import evaluate_response
-# from services.logger import log
+from services.evaluator import evaluate_response
+from services.logger import logger
 
-
-def build_context(analytics, market, sectors, news):
+def build_context(analytics, market, sectors, news, historical):
     top_sectors = sorted(analytics['sector_allocation_percent'].items(), key=lambda x: -x[1])[:3]
 
     sector_lines = "\n".join(f"{sector} has {percent}% exposure" for sector, percent in top_sectors)
@@ -89,6 +88,12 @@ def build_context(analytics, market, sectors, news):
 
     === EDGECASE3: Mixed Ambiguous Signals ===
     {case3_lines}
+
+    === HISTORICAL TRENDS (Last 7 Days) ===
+    Indices: {historical['market_trend']}
+    Market breadth: {historical['market_breadth']}
+    FII/DII Observation: {historical['fii_dii_observations']}
+    Relevant Sector History: {historical['sector_weekly_performance']}
     """
 
 
@@ -119,16 +124,18 @@ def build_context(analytics, market, sectors, news):
         12. If a stock had positive news but still fell — don't skip this. Explain that sector-wide or macro pressure was stronger than the stock-specific good news.
         13. If a stock moved against its sector (e.g., stock up while sector is down), flag it as a divergence and identify the specific reason driving that stock independently.
         14. If any news has a sentiment score close to zero, treat it as ambiguous — acknowledge both sides briefly and avoid leaning positive or negative without evidence.
+        15. If any single sector has >40% exposure, you MUST explicitly flag this as a "Concentration Risk" in the Key Risk section.
+        16. Use the HISTORICAL TRENDS to contextualize today's movement. For example, if the market has been bearish for 7 days, today's fall might be a continuation of a trend rather than a one-off event.
+        
+        # OUTPUT FORMAT (use exactly these headers):
 
+        # Summary:
+        # Primary Driver:
+        # Causal Chain:
+        # Conflicting Signals:
+        # Key Risk:
+        # Action:
 
-        OUTPUT FORMAT (use exactly these headers):
-
-        Summary:
-        Primary Driver:
-        Causal Chain:
-        Conflicting Signals:
-        Key Risk:
-        Action:
         """
 
 
@@ -140,20 +147,54 @@ def build_context(analytics, market, sectors, news):
     return context, system_prompt, user_prompt
 
 def run(portfolio_id: str):
+
+    logger.info(f"Starting analysis for portfolio: {portfolio_id}")
+
     loader=DataLoader("data")
     portfolio_engine = PortfolioAnalytics(loader)
     analytics = portfolio_engine.portfolio_analytics(portfolio_id)
+
+    logger.info("Portfolio analytics generated.")
+
     market_engine = MarketIntelligence(loader)
     market = market_engine.analyze_market_sentiment()
+
+    logger.info("Market sentiment analyzed.")
+    
     sectors = market_engine.analyze_sector_performance()
     portfolio_sectors = list(analytics["sector_allocation_percent"].keys())
+    historical = market_engine.analyze_historical_data(portfolio_sectors)
+    
     portfolio_stocks = [s["symbol"] for s in analytics["top_gainers"]] + [s["symbol"] for s in analytics["top_losers"]]
     news = market_engine.analyze_relevant_news(portfolio_sectors, portfolio_stocks)
-    context, system_prompt, user_prompt = build_context(analytics,market,sectors,news)
+    
+    logger.info(f"Extracted {len(news)} relevant news articles.")
+
+    context, system_prompt, user_prompt = build_context(analytics,market,sectors,news,historical)
+
+    logger.info("Context and prompts built successfully.")
+
     agent=Agent()
+    logger.info("Getting output from LLM...")
     result=agent.analyze(user_prompt,system_prompt)
+    
+    logger.info("Evaluating reasoning quality...")
+    eval_result=evaluate_response(result)   
+
+    logger.info(f"Evaluation completed. Score: {eval_result.get('score', 0)}/100")
+
     print("\n====== FINAL ANALYSIS ======\n")
     print(result)
+    
+    grade_icon = {"EXCELLENT": "🏆", "GOOD": "✅", "POOR": "⚠️"}.get(eval_result.get("grade", "POOR"), "•")
+    print(f"\n====== EVALUATION ======")
+    print(f"Confidence Score : {eval_result['score']}/100")
+    print(f"Grade : {grade_icon} {eval_result['grade']}")
+    print("Checks:")
+    for name, passed, reason in eval_result["checks"]:
+        icon = "✅" if passed else "❌"
+        print(f"  {icon} {name} — {reason}")
+
     return result
 
 if __name__ == "__main__":

@@ -58,10 +58,28 @@ class MarketIntelligence:
         return important_news[:7]
 
 
+    def analyze_historical_data(self,portfolio_sectors):
+        hist_data=self.loader.get_historical_data()
+        nifty=hist_data.get("index_history",{}).get("NIFTY50",{})
+        bank=hist_data.get("index_history",{}).get("BANKNIFTY",{})
+        sensex=hist_data.get("index_history",{}).get("SENSEX",{})
 
 
+        breadth_data=hist_data.get("market_breadth",{})
+        fii_dii_data=hist_data.get("fii_dii_data",{})
 
-
-
-
-        
+        sector_weekly_performance=hist_data.get("sector_weekly_performance",{})
+        only_portfolio_sectors={
+            sector:data for sector,data in sector_weekly_performance.items() if sector in portfolio_sectors
+        }
+        return {
+            "market_trend":{
+                "NIFTY50": nifty.get('cumulative_change_percent', 0),
+                "BANKNIFTY": bank.get('cumulative_change_percent', 0),
+                "SENSEX": sensex.get('cumulative_change_percent', 0)
+                },
+            "market_breadth": breadth_data,
+            "fii_dii_data": fii_dii_data,
+            "fii_dii_observations": fii_dii_data.get("observation", ""),
+            "sector_weekly_performance":only_portfolio_sectors,
+        }
