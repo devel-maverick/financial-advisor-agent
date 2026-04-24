@@ -18,6 +18,36 @@ def read_root():
 def health_check():
     return {"status": "healthy"}
 
+@app.get("/portfolio/{portfolio_id}")
+def get_portfolio_data(portfolio_id: str):
+    logger.info(f"API: Fetching dashboard data for {portfolio_id}")
+    try:
+        loader = DataLoader("data")
+        portfolio_engine = PortfolioAnalytics(loader)
+        analytics = portfolio_engine.portfolio_analytics(portfolio_id)
+        if not analytics:
+            raise HTTPException(status_code=404, detail="Portfolio not found")
+            
+        market_engine = MarketIntelligence(loader)
+        market = market_engine.analyze_market_sentiment()
+        sectors = market_engine.analyze_sector_performance()
+        portfolio_sectors = list(analytics["sector_allocation_percent"].keys())
+        historical = market_engine.analyze_historical_data(portfolio_sectors)
+        
+        portfolio_stocks = [s["symbol"] for s in analytics["top_gainers"]] + [s["symbol"] for s in analytics["top_losers"]]
+        news = market_engine.analyze_relevant_news(portfolio_sectors, portfolio_stocks)
+        
+        return {
+            "analytics": analytics,
+            "market": market,
+            "sectors": sectors,
+            "news": news,
+            "historical": historical
+        }
+    except Exception as e:
+        logger.error(f"API Data Error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/analyze")
 def analyze_portfolio(request: AnalysisRequest):
     portfolio_id = request.portfolio_id
@@ -68,4 +98,4 @@ def analyze_portfolio(request: AnalysisRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=5000)
+    uvicorn.run(app, host="0.0.0.0", port=8000)
