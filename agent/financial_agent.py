@@ -1,5 +1,6 @@
 import os
 from langfuse.openai import OpenAI
+from services.logger import logger
 
 class Agent:
     def __init__(self):
@@ -9,7 +10,7 @@ class Agent:
         )
 
     def analyze(self, user_prompt: str, system_prompt: str):
-
+        logger.info("Sending prompt to LLM")
         response = self.client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=[
@@ -18,5 +19,6 @@ class Agent:
             ],
             temperature=0.2
         )
-
+        
+        logger.info("Received response from LLM successfully.")
         return response.choices[0].message.content

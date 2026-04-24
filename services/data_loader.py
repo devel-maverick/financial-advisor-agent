@@ -22,4 +22,3 @@ class DataLoader:
         return self.load("historical_data.json")
     def get_sector_data(self):
         return self.load("sector_mapping.json")
-
