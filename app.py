@@ -2,18 +2,21 @@ from dotenv import load_dotenv
 load_dotenv(override=True)
 
 import streamlit as st
+import requests
 import sys
 import os
-# os.environ["GROQ_API_KEY"] = st.secrets["GROQ_API_KEY"]
-sys.path.insert(0, os.path.dirname(__file__))
 
-from services.data_loader import DataLoader
-from services.portfolio_analytics import PortfolioAnalytics
-from services.market_intelligence import MarketIntelligence
-from services.langfuse import langfuse
-from agent.financial_agent import Agent
-from main import build_context
-from services.evaluator import evaluate_response
+# API Config
+if "API_BASE_URL" in st.secrets:
+    API_BASE_URL = st.secrets["API_BASE_URL"]
+else:
+    API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000")
+
+# Load secrets into os.environ for backend services if available
+for key in ["GROQ_API_KEY", "OPENAI_API_KEY", "LANGFUSE_PUBLIC_KEY", "LANGFUSE_SECRET_KEY", "LANGFUSE_HOST"]:
+    if key in st.secrets:
+        os.environ[key] = st.secrets[key]
+
 from services.logger import logger
 
 import streamlit.components.v1 as components
@@ -279,6 +282,23 @@ section[data-testid="stSidebar"] > div:first-child { padding-top: 16px; }
     will-change: transform;
 }
 .ticker-track:hover { animation-play-state: paused; }
+/* Expander */
+.stExpander {
+    background: #ffffff !important;
+    border: 1.5px solid #e2e8f0 !important;
+    border-radius: 12px !important;
+    margin-top: 10px;
+}
+.stExpander summary p {
+    color: #0f172a !important;
+    font-weight: 600 !important;
+}
+.stExpander [data-testid="stExpanderDetails"] p,
+.stExpander [data-testid="stExpanderDetails"] span,
+.stExpander [data-testid="stExpanderDetails"] div,
+.stExpander [data-testid="stExpanderDetails"] label {
+    color: #0f172a !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -444,23 +464,28 @@ st.markdown("<hr style='border:none;border-top:1.5px solid #e2e8f0;margin:0 0 20
 # ── Load data ─────────────────────────────────────────────────────────────────
 @st.cache_data(show_spinner=False)
 def load_analytics(portfolio_id: str):
-    loader = DataLoader("data")
-    pa = PortfolioAnalytics(loader)
-    mi = MarketIntelligence(loader)
-    analytics = pa.portfolio_analytics(portfolio_id)
-    market    = mi.analyze_market_sentiment()
-    sectors   = mi.analyze_sector_performance()
-    port_sectors = list(analytics["sector_allocation_percent"].keys())
-    port_stocks  = (
-        [s["symbol"] for s in analytics["top_gainers"]] +
-        [s["symbol"] for s in analytics["top_losers"]]
-    )
-    news = mi.analyze_relevant_news(port_sectors, port_stocks)
-    historical = mi.analyze_historical_data(port_sectors)
-    return analytics, market, sectors, news, historical
+    try:
+        response = requests.get(f"{API_BASE_URL}/portfolio/{portfolio_id}")
+        response.raise_for_status()
+        data = response.json()
+        return (
+            data["analytics"], 
+            data["market"], 
+            data["sectors"], 
+            data["news"], 
+            data["historical"]
+        )
+    except Exception as e:
+        st.error(f"Failed to fetch data from API: {str(e)}")
+        return None, None, None, None, None
 
 
 analytics, market, sectors, news, historical = load_analytics(selected_id)
+
+if analytics is None:
+    st.error("Could not connect to the DalalAI API. Please ensure the server is running.")
+    st.stop()
+
 pnl        = analytics["total_daily_pnl"]
 pnl_pct    = analytics["daily_pnl_percent"]
 port_value = analytics["total_current_value"]
@@ -690,7 +715,7 @@ with ai_title_col:
     score_html = ""
     if st.session_state.get("eval_result"):
         score = st.session_state.eval_result.get("mixed_score", 0)
-        score_html = f'<span style="margin-left:12px;font-size:12px;font-weight:700;background:#dcfce7;color:#166534;padding:4px 10px;border-radius:99px;border:1px solid #bbf7d0;">Confidence Score: {score}%</span>'
+        score_html = f'<span style="margin-left:12px;font-size:12px;font-weight:700;background:#dcfce7;color:#166534;padding:4px 10px;border-radius:99px;border:1px solid #bbf7d0;">Confidence: {score}%</span>'
     title_placeholder.markdown(f'<div class="section-title" style="display:flex;align-items:center;">AI Reasoning Engine {score_html}</div>', unsafe_allow_html=True)
 with ai_btn_col:
     inline_run_btn = st.button("🤖 Run Analysis", key="inline_run", use_container_width=True)
@@ -711,22 +736,47 @@ if st.session_state.last_portfolio != selected_id:
 if run_btn or inline_run_btn:
     logger.info(f"Streamlit UI: Analysis started for portfolio {selected_id}")
     with st.spinner("Agent is reasoning through your portfolio..."):
-        _, system_prompt, user_prompt = build_context(analytics, market, sectors, news, historical)
-        agent = Agent()
-        result = agent.analyze(user_prompt, system_prompt)
-        eval_res = evaluate_response(result)
-        logger.info(f"Streamlit UI: Analysis complete. Score: {eval_res.get('score', 0)}")
-        langfuse.flush()
-        st.session_state.analysis_result = result
-        st.session_state.eval_result = eval_res
-        
-        # Update title placeholder with new score immediately
-        score = eval_res.get("mixed_score", 0)
-        score_html = f'<span style="margin-left:12px;font-size:12px;font-weight:700;background:#dcfce7;color:#166534;padding:4px 10px;border-radius:99px;border:1px solid #bbf7d0;">Confidence Score: {score}%</span>'
-        title_placeholder.markdown(f'<div class="section-title" style="display:flex;align-items:center;">AI Reasoning Engine {score_html}</div>', unsafe_allow_html=True)
+        try:
+            response = requests.post(
+                f"{API_BASE_URL}/analyze",
+                json={"portfolio_id": selected_id}
+            )
+            response.raise_for_status()
+            api_result = response.json()
+            
+            # The API returns 'analysis' as a dict or string, and 'evaluation' as a dict
+            st.session_state.analysis_result = api_result["analysis"]
+            st.session_state.eval_result = api_result["evaluation"]
+            
+            logger.info(f"Streamlit UI: Analysis complete.")
+            
+            # Update title placeholder with new score immediately
+            score = st.session_state.eval_result.get("mixed_score", 0)
+            score_html = f'<span style="margin-left:12px;font-size:12px;font-weight:700;background:#dcfce7;color:#166534;padding:4px 10px;border-radius:99px;border:1px solid #bbf7d0;">Confidence: {score}%</span>'
+            title_placeholder.markdown(f'<div class="section-title" style="display:flex;align-items:center;">AI Reasoning Engine {score_html}</div>', unsafe_allow_html=True)
+        except Exception as e:
+            st.error(f"Analysis failed: {str(e)}")
 
 if st.session_state.analysis_result:
-    sections = parse_analysis(st.session_state.analysis_result)
+    # If analysis_result is already a dict (from API), we don't need to parse it
+    if isinstance(st.session_state.analysis_result, dict):
+        sections = {}
+        mapping = {
+            "summary": "Summary",
+            "primary_driver": "Primary Driver",
+            "causal_chain": "Causal Chain",
+            "conflicting_signals": "Conflicting Signals",
+            "key_risk": "Key Risk",
+            "action": "Action"
+        }
+        for k, v in st.session_state.analysis_result.items():
+            ui_key = mapping.get(k, k.replace("_", " ").title())
+            if isinstance(v, list):
+                sections[ui_key] = "\n".join(v)
+            else:
+                sections[ui_key] = str(v)
+    else:
+        sections = parse_analysis(st.session_state.analysis_result)
 
     CARD_STYLES = {
         "Summary":              ("📋", "#6366f1", "#eff6ff"),
@@ -770,26 +820,25 @@ if st.session_state.analysis_result:
         </div>
         """, unsafe_allow_html=True)
 
-    # ── AI Self-Reflection Card (Hybrid Score Details) ────────────────────────
+    # ── AI Self-Reflection Card (Compliance & Confidence) ─────────────────────
     ev = st.session_state.eval_result
     if ev:
         st.markdown("---")
-        with st.expander("🔍 Reasoning Evaluation (Confidence Breakdown)", expanded=False):
-            c1, c2, c3 = st.columns(3)
+        with st.expander("🔍 Reasoning Evaluation & Compliance", expanded=False):
+            c1, c2 = st.columns([1, 2])
             with c1:
-                st.metric("Technical Score", f"{ev.get('rule_score', 0)}%")
+                st.metric("Overall Confidence", f"{ev.get('mixed_score', 0)}%")
             with c2:
-                st.metric("LLM Confidence", f"{ev.get('llm_score', 0)}%")
-            with c3:
-                st.metric("Final Confidence", f"{ev.get('mixed_score', 0)}%")
-            
-            st.markdown(f"**AI Justification:** *\"{ev.get('justification', 'N/A')}\"*")
+                st.markdown(f"**AI Justification:** *\"{ev.get('justification', 'N/A')}\"*")
             
             st.markdown("---")
             st.markdown("**Compliance Checks:**")
-            for name, passed, reason in ev.get("checks", []):
+            check_cols = st.columns(2)
+            for i, (name, passed, reason) in enumerate(ev.get("checks", [])):
                 icon = "✅" if passed else "❌"
-                st.markdown(f"{icon} **{name.title()}**: {reason}")
+                with check_cols[i % 2]:
+                    st.markdown(f"{icon} **{name.title()}**: {reason}")
+
 else:
     st.markdown("""
     <div style="

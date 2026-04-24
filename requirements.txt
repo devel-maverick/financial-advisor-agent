@@ -5,4 +5,4 @@ langfuse
 openai
 groq
 streamlit
-
+requests

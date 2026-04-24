@@ -127,8 +127,6 @@ def build_context(analytics, market, sectors, news, historical):
         15. If any single sector has >40% exposure, you MUST explicitly flag this as a "Concentration Risk" in the Key Risk section.
         16. Use the HISTORICAL TRENDS to contextualize today's movement. For example, if the market has been bearish for 7 days, today's fall might be a continuation of a trend rather than a one-off event.
         
-        # OUTPUT FORMAT (use exactly these headers):
-
         # OUTPUT FORMAT:
         You MUST respond in strict JSON format with these exact keys:
         {
@@ -138,7 +136,8 @@ def build_context(analytics, market, sectors, news, historical):
           "conflicting_signals": "Detailed explanation of any divergence or conflicting news vs price action.",
           "key_risk": "Specific risk identification (e.g. concentration, rate sensitivity) with numbers.",
           "action": "One specific, data-backed actionable suggestion for the investor.",
-          "self_score": number (0-100) based on your confidence in this analysis
+          "self_score": number (0-100) based on your confidence in this analysis,
+          "justification": "A brief explanation of why you gave yourself this score, acknowledging any data gaps or uncertainties."
         }
 
         Do NOT include any markdown formatting like ```json or any other text outside the JSON object.

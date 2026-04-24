@@ -90,5 +90,6 @@ def evaluate_response(response: dict):
         "mixed_score": mixed_score,
         "score": mixed_score,
         "grade": grade,
-        "checks": checks
+        "checks": checks,
+        "justification": response.get("justification", "N/A")
     }
