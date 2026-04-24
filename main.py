@@ -135,7 +135,7 @@ def build_context(analytics, market, sectors, news, historical):
         # Conflicting Signals:
         # Key Risk:
         # Action:
-
+        # Self-Evaluation Score: [A number from 0 to 100 representing your confidence in this analysis] based on data provided to you as an context
         """
 
 
@@ -181,14 +181,14 @@ def run(portfolio_id: str):
     logger.info("Evaluating reasoning quality...")
     eval_result=evaluate_response(result)   
 
-    logger.info(f"Evaluation completed. Score: {eval_result.get('score', 0)}/100")
+    logger.info(f"Evaluation completed. Score: {eval_result.get('mixed_score', 0)}/100")
 
     print("\n====== FINAL ANALYSIS ======\n")
     print(result)
     
     grade_icon = {"EXCELLENT": "🏆", "GOOD": "✅", "POOR": "⚠️"}.get(eval_result.get("grade", "POOR"), "•")
     print(f"\n====== EVALUATION ======")
-    print(f"Confidence Score : {eval_result['score']}/100")
+    print(f"Confidence Score : {eval_result['mixed_score']}/100")
     print(f"Grade : {grade_icon} {eval_result['grade']}")
     print("Checks:")
     for name, passed, reason in eval_result["checks"]:

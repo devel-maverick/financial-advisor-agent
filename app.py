@@ -295,7 +295,7 @@ def fmt_inr(v: float) -> str:
 def parse_analysis(text: str) -> dict:
     """Split agent output into named sections."""
     import re
-    keys = ["Summary", "Primary Driver", "Causal Chain", "Conflicting Signals", "Key Risk", "Action"]
+    keys = ["Summary", "Primary Driver", "Causal Chain", "Conflicting Signals", "Key Risk", "Action", "Self-Evaluation Score", "Self-Evaluation Justification"]
     result = {}
     for i, key in enumerate(keys):
         tag = f"{key}:"
@@ -677,8 +677,8 @@ with ai_title_col:
     title_placeholder = st.empty()
     score_html = ""
     if st.session_state.get("eval_result"):
-        score = st.session_state.eval_result.get("score", 0)
-        score_html = f'<span style="margin-left:12px;font-size:12px;font-weight:700;background:#dcfce7;color:#166534;padding:4px 10px;border-radius:99px;border:1px solid #bbf7d0;">Confidence: {score}%</span>'
+        score = st.session_state.eval_result.get("mixed_score", 0)
+        score_html = f'<span style="margin-left:12px;font-size:12px;font-weight:700;background:#dcfce7;color:#166534;padding:4px 10px;border-radius:99px;border:1px solid #bbf7d0;">Confidence Score: {score}%</span>'
     title_placeholder.markdown(f'<div class="section-title" style="display:flex;align-items:center;">AI Reasoning Engine {score_html}</div>', unsafe_allow_html=True)
 with ai_btn_col:
     inline_run_btn = st.button("🤖 Run Analysis", key="inline_run", use_container_width=True)
@@ -709,8 +709,8 @@ if run_btn or inline_run_btn:
         st.session_state.eval_result = eval_res
         
         # Update title placeholder with new score immediately
-        score = eval_res.get("score", 0)
-        score_html = f'<span style="margin-left:12px;font-size:12px;font-weight:700;background:#dcfce7;color:#166534;padding:4px 10px;border-radius:99px;border:1px solid #bbf7d0;">Confidence: {score}%</span>'
+        score = eval_res.get("mixed_score", 0)
+        score_html = f'<span style="margin-left:12px;font-size:12px;font-weight:700;background:#dcfce7;color:#166534;padding:4px 10px;border-radius:99px;border:1px solid #bbf7d0;">Confidence Score: {score}%</span>'
         title_placeholder.markdown(f'<div class="section-title" style="display:flex;align-items:center;">AI Reasoning Engine {score_html}</div>', unsafe_allow_html=True)
 
 if st.session_state.analysis_result:
@@ -727,6 +727,9 @@ if st.session_state.analysis_result:
     }
 
     for title, body in sections.items():
+        if "Self-Evaluation" in title:
+            continue
+            
         icon, accent, _ = CARD_STYLES.get(title, ("•", "#6366f1", "#ffffff"))
         formatted_body = text_to_bullets(body, title)
         st.markdown(f"""
@@ -751,6 +754,27 @@ if st.session_state.analysis_result:
             </div>
         </div>
         """, unsafe_allow_html=True)
+
+    # ── AI Self-Reflection Card (Hybrid Score Details) ────────────────────────
+    ev = st.session_state.eval_result
+    if ev:
+        st.markdown("---")
+        with st.expander("🔍 Reasoning Evaluation (Confidence Breakdown)", expanded=False):
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                st.metric("Technical Score", f"{ev.get('rule_score', 0)}%")
+            with c2:
+                st.metric("LLM Confidence", f"{ev.get('llm_score', 0)}%")
+            with c3:
+                st.metric("Final Confidence", f"{ev.get('mixed_score', 0)}%")
+            
+            st.markdown(f"**AI Justification:** *\"{ev.get('justification', 'N/A')}\"*")
+            
+            st.markdown("---")
+            st.markdown("**Compliance Checks:**")
+            for name, passed, reason in ev.get("checks", []):
+                icon = "✅" if passed else "❌"
+                st.markdown(f"{icon} **{name.title()}**: {reason}")
 else:
     st.markdown("""
     <div style="

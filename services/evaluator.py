@@ -7,6 +7,8 @@ def parse_llm_output(text: str) -> dict:
         "conflicting_signals": r"# Conflicting Signals:\s*(.*?)(?=#|$)",
         "key_risk": r"# Key Risk:\s*(.*?)(?=#|$)",
         "action": r"# Action:\s*(.*?)(?=#|$)",
+        "self_score": r"# Self-Evaluation Score:\s*(\d+)",
+        "justification": r"# Self-Evaluation Justification:\s*(.*?)(?=#|$)",
     }
 
     result = {}
@@ -78,19 +80,28 @@ def evaluate_response(response: dict):
     else:
         checks.append(("Uses numbers", False, "Reasoning contains no numbers"))
 
-    # Grade
-
-    if score >= 80:
+    #here lmm will give its own score 
+    llm_score= response.get("self_score", "0")
+    try:
+        llm_score = int(llm_score)
+    except:
+        llm_score = 0
+    
+    mixed_score = int((score + llm_score) / 2) if llm_score > 0 else score
+    
+    if mixed_score >= 80:
         grade = "EXCELLENT"
-    elif score >= 60:
+    elif mixed_score >= 60:
         grade = "GOOD"
     else:
         grade = "POOR"
 
-
-
     return {
-        "score": score,
+        "rule_score": score,
+        "llm_score": llm_score,
+        "mixed_score": mixed_score,
+        "score": mixed_score,
         "grade": grade,
-        "checks": checks
+        "checks": checks,
+        "justification": response.get("justification", "N/A")
     }
