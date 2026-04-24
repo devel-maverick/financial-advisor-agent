@@ -4,7 +4,7 @@ load_dotenv(override=True)
 import streamlit as st
 import sys
 import os
-os.environ["GROQ_API_KEY"] = st.secrets["GROQ_API_KEY"]
+# os.environ["GROQ_API_KEY"] = st.secrets["GROQ_API_KEY"]
 sys.path.insert(0, os.path.dirname(__file__))
 
 from services.data_loader import DataLoader
@@ -293,28 +293,34 @@ def fmt_inr(v: float) -> str:
     return f"{sign}₹{v:,.0f}"
 
 def parse_analysis(text: str) -> dict:
-    """Split agent output into named sections."""
+    """Parse JSON analysis result."""
+    import json
     import re
-    keys = ["Summary", "Primary Driver", "Causal Chain", "Conflicting Signals", "Key Risk", "Action", "Self-Evaluation Score", "Self-Evaluation Justification"]
-    result = {}
-    for i, key in enumerate(keys):
-        tag = f"{key}:"
-        start = text.find(tag)
-        if start == -1:
-            continue
-        start += len(tag)
-        next_start = len(text)
-        for other in keys[i+1:]:
-            pos = text.find(f"{other}:", start)
-            if pos != -1:
-                next_start = min(next_start, pos)
-                break
-        body = text[start:next_start].strip()
-        body = re.sub(r'^#+\s*', '', body, flags=re.MULTILINE).strip()
-        result[key] = body
-    if not result:
-        result["Analysis"] = text.strip()
-    return result
+    try:
+        clean_text = re.sub(r"```json\s*|\s*```", "", text.strip())
+        data = json.loads(clean_text)
+        
+        # Mapping JSON keys to UI Display Keys if needed
+        mapping = {
+            "summary": "Summary",
+            "primary_driver": "Primary Driver",
+            "causal_chain": "Causal Chain",
+            "conflicting_signals": "Conflicting Signals",
+            "key_risk": "Key Risk",
+            "action": "Action"
+        }
+        
+        result = {}
+        for k, v in data.items():
+            ui_key = mapping.get(k, k.replace("_", " ").title())
+            if isinstance(v, list):
+                result[ui_key] = "\n".join(v)
+            else:
+                result[ui_key] = str(v)
+        return result
+    except:
+        # Fallback for old text or failed JSON
+        return {"Analysis": text}
 
 def text_to_bullets(text: str, section: str) -> str:
     """Convert a text block into styled HTML."""
@@ -345,27 +351,33 @@ def text_to_bullets(text: str, section: str) -> str:
             steps_html = ""
             for idx, step in enumerate(steps):
                 connector = ""
+                # Improved connector line
                 if idx < len(steps) - 1:
-                    connector = '<div style="display:flex;align-items:center;padding:4px 0 4px 19px;"><div style="width:2px;height:24px;background:linear-gradient(180deg,#6366f1,#3b82f6);"></div></div>'
+                    connector = f'<div style="margin-left: 17px; border-left: 2px dashed #6366f1; height: 20px; margin-top: -2px; margin-bottom: -2px;"></div>'
+                
                 badge_html = ""
                 for tag, (label, color, bg) in STEP_BADGES.items():
-                    if step.startswith(tag):
-                        step = step[len(tag):].strip()
-                        badge_html = f'<span style="font-size:10px;font-weight:700;background:{bg};color:{color};border-radius:99px;padding:2px 8px;margin-bottom:6px;display:inline-block;">{label}</span><br>'
+                    if tag in step:
+                        step = step.replace(tag, "").strip()
+                        badge_html = f'<span style="font-size:10px;font-weight:800;background:{bg};color:{color};border-radius:4px;padding:1px 6px;margin-right:8px;vertical-align:middle;">{label}</span>'
                         break
+                
                 steps_html += f'''
-                <div style="display:flex;align-items:flex-start;gap:12px;">
-                    <div style="min-width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#6366f1,#3b82f6);
-                        color:white;font-size:13px;font-weight:700;display:flex;align-items:center;
-                        justify-content:center;flex-shrink:0;margin-top:2px;">{idx+1}</div>
-                    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;
-                        padding:10px 14px;font-size:14px;font-weight:500;color:#1e293b;
-                        line-height:1.5;flex:1;">{badge_html}{step}</div>
+                <div style="display:flex;align-items:center;gap:12px;margin-bottom:0px;">
+                    <div style="width:36px;height:36px;border-radius:8px;background:#000000;color:#ffffff;
+                        font-size:16px;font-weight:900;display:flex;align-items:center;
+                        justify-content:center;flex-shrink:0;border:2px solid #000000;box-shadow: 2px 2px 0px #6366f1;">{idx+1}</div>
+                    <div style="background:#ffffff;border:2px solid #000000;border-radius:8px;
+                        padding:12px 16px;font-size:14px;font-weight:600;color:#000000;
+                        line-height:1.4;flex:1;box-shadow: 3px 3px 0px rgba(0,0,0,0.05);">
+                        {badge_html} {step}
+                    </div>
                 </div>{connector}'''
+            return f'<div style="padding:10px 0;">{intro_html}{steps_html}</div>'
             return f'<div style="padding:4px 0;">{intro_html}{steps_html}</div>'
 
     # ── Bullet list for all other sections ────────────────────────────────────
-    lines   = [re.sub(r'^[-*•\d+\.]+\s*', '', l).strip() for l in text.split('\n')]
+    lines   = [re.sub(r'^[-*•]\s*|^\d+\.\s+', '', l).strip() for l in text.split('\n')]
     bullets = [l for l in lines if l]
 
     if len(bullets) <= 1:
@@ -727,7 +739,7 @@ if st.session_state.analysis_result:
     }
 
     for title, body in sections.items():
-        if "Self-Evaluation" in title:
+        if "Self-Evaluation" in title or "Self Score" in title:
             continue
             
         icon, accent, _ = CARD_STYLES.get(title, ("•", "#6366f1", "#ffffff"))
@@ -741,6 +753,9 @@ if st.session_state.analysis_result:
             padding: 24px 28px;
             margin-bottom: 20px;
             box-shadow: 6px 6px 0px rgba(0, 0, 0, 1);
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            min-height: fit-content;
         ">
             <div style="
                 font-size: 16px; font-weight: 900; letter-spacing: 0.1em;
@@ -749,7 +764,7 @@ if st.session_state.analysis_result:
             ">
                 <span style="font-size: 22px;">{icon}</span> {title}
             </div>
-            <div style="font-size:14px;line-height:1.7;color:#1e293b;">
+            <div style="font-size:15px;line-height:1.7;color:#000000;font-weight:600;">
                 {formatted_body}
             </div>
         </div>
@@ -767,6 +782,8 @@ if st.session_state.analysis_result:
                 st.metric("LLM Confidence", f"{ev.get('llm_score', 0)}%")
             with c3:
                 st.metric("Final Confidence", f"{ev.get('mixed_score', 0)}%")
+            
+            st.markdown(f"**AI Justification:** *\"{ev.get('justification', 'N/A')}\"*")
             
             st.markdown("---")
             st.markdown("**Compliance Checks:**")

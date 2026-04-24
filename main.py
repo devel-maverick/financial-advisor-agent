@@ -129,13 +129,19 @@ def build_context(analytics, market, sectors, news, historical):
         
         # OUTPUT FORMAT (use exactly these headers):
 
-        # Summary:
-        # Primary Driver:
-        # Causal Chain:
-        # Conflicting Signals:
-        # Key Risk:
-        # Action:
-        # Self-Evaluation Score: [A number from 0 to 100 representing your confidence in this analysis] based on data provided to you as an context
+        # OUTPUT FORMAT:
+        You MUST respond in strict JSON format with these exact keys:
+        {
+          "summary": "Detailed 2-3 sentence overview of why the portfolio moved as it did, mentioning specific macro and sector factors.",
+          "primary_driver": "In-depth explanation of the #1 most impactful factor, including the 'Why' behind its movement.",
+          "causal_chain": ["list of strings starting with [NEWS], [SECTOR], [STOCK], or [PORTFOLIO] showing the flow"],
+          "conflicting_signals": "Detailed explanation of any divergence or conflicting news vs price action.",
+          "key_risk": "Specific risk identification (e.g. concentration, rate sensitivity) with numbers.",
+          "action": "One specific, data-backed actionable suggestion for the investor.",
+          "self_score": number (0-100) based on your confidence in this analysis
+        }
+
+        Do NOT include any markdown formatting like ```json or any other text outside the JSON object.
         """
 
 

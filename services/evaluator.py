@@ -1,23 +1,12 @@
+import json
 import re
+
 def parse_llm_output(text: str) -> dict:
-    fields = {
-        "summary": r"# Summary:\s*(.*?)(?=#|$)",
-        "primary_driver": r"# Primary Driver:\s*(.*?)(?=#|$)",
-        "causal_chain": r"# Causal Chain:\s*(.*?)(?=#|$)",
-        "conflicting_signals": r"# Conflicting Signals:\s*(.*?)(?=#|$)",
-        "key_risk": r"# Key Risk:\s*(.*?)(?=#|$)",
-        "action": r"# Action:\s*(.*?)(?=#|$)",
-        "self_score": r"# Self-Evaluation Score:\s*(\d+)",
-        "justification": r"# Self-Evaluation Justification:\s*(.*?)(?=#|$)",
-    }
-
-    result = {}
-
-    for key, pattern in fields.items():
-        match = re.search(pattern, text, re.DOTALL | re.IGNORECASE)
-        result[key] = match.group(1).strip() if match else ""
-
-    return result
+    try:
+        clean_text = re.sub(r"```json\s*|\s*```", "", text.strip())
+        return json.loads(clean_text)
+    except Exception as e:
+        return {"error": f"Failed to parse JSON: {str(e)}", "raw": text}
 
 def evaluate_response(response: dict):
     score = 0
@@ -40,13 +29,12 @@ def evaluate_response(response: dict):
         checks.append(("primary_driver", False, "Missing or vague"))
 
     #check causal chain-----important 
-    chain = response.get("causal_chain", "")
-    chain_steps = [l for l in chain.strip().split('\n') if l.strip()]
-    if len(chain_steps) >= 3:
+    chain = response.get("causal_chain", [])
+    if isinstance(chain, list) and len(chain) >= 3:
         score += 25
-        checks.append(("causal_chain", True, "3 or more steps found"))
+        checks.append(("causal_chain", True, f"{len(chain)} steps found in chain"))
     else:
-        checks.append(("causal_chain", False, "Less than 3 steps found"))
+        checks.append(("causal_chain", False, "Chain is missing or has less than 3 steps"))
 
     #check conflicting signals
     conflicts = response.get("conflicting_signals", "")
@@ -102,6 +90,5 @@ def evaluate_response(response: dict):
         "mixed_score": mixed_score,
         "score": mixed_score,
         "grade": grade,
-        "checks": checks,
-        "justification": response.get("justification", "N/A")
+        "checks": checks
     }
