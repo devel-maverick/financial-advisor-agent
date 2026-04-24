@@ -4,7 +4,7 @@ load_dotenv(override=True)
 import streamlit as st
 import sys
 import os
-
+os.environ["GROQ_API_KEY"] = st.secrets["GROQ_API_KEY"]
 sys.path.insert(0, os.path.dirname(__file__))
 
 from services.data_loader import DataLoader
@@ -767,8 +767,6 @@ if st.session_state.analysis_result:
                 st.metric("LLM Confidence", f"{ev.get('llm_score', 0)}%")
             with c3:
                 st.metric("Final Confidence", f"{ev.get('mixed_score', 0)}%")
-            
-            st.markdown(f"**AI Justification:** *\"{ev.get('justification', 'N/A')}\"*")
             
             st.markdown("---")
             st.markdown("**Compliance Checks:**")
