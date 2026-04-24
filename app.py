@@ -789,7 +789,7 @@ if st.session_state.analysis_result:
     }
 
     for title, body in sections.items():
-        if "Self-Evaluation" in title or "Self Score" in title:
+        if "Self-Evaluation" in title or "Self Score" in title or "Justification" in title:
             continue
             
         icon, accent, _ = CARD_STYLES.get(title, ("•", "#6366f1", "#ffffff"))
