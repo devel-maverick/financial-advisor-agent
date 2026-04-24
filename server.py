@@ -2,6 +2,8 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import uvicorn
 import re
+from dotenv import load_dotenv
+load_dotenv(override=True)
 from main import build_context, Agent, DataLoader, PortfolioAnalytics, MarketIntelligence, evaluate_response, logger
 from services.langfuse import langfuse
 
@@ -25,7 +27,8 @@ def get_portfolio_data(portfolio_id: str):
         loader = DataLoader("data")
         portfolio_engine = PortfolioAnalytics(loader)
         analytics = portfolio_engine.portfolio_analytics(portfolio_id)
-        if not analytics:
+        if not analytics or isinstance(analytics, str):
+            logger.warning(f"⚠️ Portfolio {portfolio_id} not found")
             raise HTTPException(status_code=404, detail="Portfolio not found")
             
         market_engine = MarketIntelligence(loader)
@@ -57,7 +60,8 @@ def analyze_portfolio(request: AnalysisRequest):
         loader = DataLoader("data")
         portfolio_engine = PortfolioAnalytics(loader)
         analytics = portfolio_engine.portfolio_analytics(portfolio_id)
-        if not analytics:
+        if not analytics or isinstance(analytics, str):
+            logger.warning(f"⚠️ Portfolio {portfolio_id} not found for analysis")
             raise HTTPException(status_code=404, detail="Portfolio not found")
         market_engine = MarketIntelligence(loader)
         market = market_engine.analyze_market_sentiment()
