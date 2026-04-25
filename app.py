@@ -1026,11 +1026,21 @@ function getTime() {{
     return new Date().toLocaleTimeString([], {{hour: '2-digit', minute:'2-digit'}});
 }}
 
+function mdToHtml(t) {{
+    t = t.replace(/\\n/g, '<br>');
+    t = t.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    t = t.replace(/\*(.+?)\*/g, '<em>$1</em>');
+    t = t.replace(/(?:^|<br>)\s*[\*\-]\s+/g, '<br>• ');
+    t = t.replace(/`([^`]+)`/g, '<code style="background:#e2e8f0;padding:2px 6px;border-radius:4px;font-size:13px;">$1</code>');
+    return t;
+}}
+
 function appendMsg(role, text) {{
     const body = document.getElementById('dalal-chat-body');
     const row = document.createElement('div');
     row.className = 'msg-row ' + role;
-    row.innerHTML = '<div><div class="msg-bubble">' + text.replace(/\\n/g,'<br>') + '</div><div class="msg-time">' + getTime() + '</div></div>';
+    const rendered = role === 'bot' ? mdToHtml(text) : text.replace(/\\n/g,'<br>');
+    row.innerHTML = '<div><div class="msg-bubble">' + rendered + '</div><div class="msg-time">' + getTime() + '</div></div>';
     body.appendChild(row);
     body.scrollTop = body.scrollHeight;
 }}
