@@ -1,12 +1,12 @@
 
 
-# 🏦 DalalAI: Autonomous Financial Advisor Agent
+# DalalAI: Autonomous Financial Advisor Agent
 
 DalalAI is an AI-powered financial advisor that goes beyond data reporting. It implements a **Reasoning & Causality Layer** to link Macro News → Sector Trends → Stock Performance → Portfolio Impact.
 
 ---
 
-## 🚀 Key Features
+## Key Features
 
 - **Causal Reasoning**: Automatically links external events (like RBI policy) to your portfolio movement.
 - **Risk Detection**: Identifies concentration risks (e.g., >40% exposure in one sector).
@@ -16,7 +16,7 @@ DalalAI is an AI-powered financial advisor that goes beyond data reporting. It i
 
 ---
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 - **LLM**: Groq (Llama 3)
 - **Backend**: FastAPI
@@ -56,7 +56,7 @@ DalalAI is an AI-powered financial advisor that goes beyond data reporting. It i
 
 ---
 
-## 🏃 How to Run
+## How to Run
 
 ### 1. Run via CLI (Quick Test)
 To see the reasoning engine in the terminal:
@@ -79,7 +79,7 @@ streamlit run app.py
 
 ---
 
-## 📸 Screenshots
+## Screenshots
 
 ### Dashboard Overview
 
