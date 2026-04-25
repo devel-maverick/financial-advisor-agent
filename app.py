@@ -6,16 +6,16 @@ import requests
 import sys
 import os
 
-# API Config
-if "API_BASE_URL" in st.secrets:
-    API_BASE_URL = st.secrets["API_BASE_URL"]
-else:
-    API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000")
-
-# Load secrets into os.environ for backend services if available
-for key in ["GROQ_API_KEY", "OPENAI_API_KEY", "LANGFUSE_PUBLIC_KEY", "LANGFUSE_SECRET_KEY", "LANGFUSE_HOST"]:
-    if key in st.secrets:
-        os.environ[key] = st.secrets[key]
+# API Config — use .env by default, only check st.secrets if file exists
+API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000")
+try:
+    _secrets = st.secrets._parse()
+    API_BASE_URL = _secrets.get("API_BASE_URL", API_BASE_URL)
+    for key in ["GROQ_API_KEY", "OPENAI_API_KEY", "LANGFUSE_PUBLIC_KEY", "LANGFUSE_SECRET_KEY", "LANGFUSE_HOST"]:
+        if key in _secrets:
+            os.environ[key] = _secrets[key]
+except Exception:
+    pass
 
 from services.logger import logger
 
@@ -854,3 +854,231 @@ else:
         <div style="font-size:13px;margin-top:6px;">Click <strong>"Run AI Analysis"</strong> in the sidebar to generate causal reasoning for this portfolio.</div>
     </div>
     """, unsafe_allow_html=True)
+
+
+# ── Floating Chat Widget (AskDisha style) ────────────────────────────────────
+chat_widget_html = f"""
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+html, body {{
+    margin: 0; padding: 0;
+    background: transparent !important;
+    overflow: hidden;
+    width: 100%; height: 100%;
+    pointer-events: none;
+    font-family: 'Inter', sans-serif;
+}}
+#dalal-fab, #dalal-fab-label, #dalal-chat {{ pointer-events: auto; }}
+
+#dalal-fab {{
+    position: absolute; bottom: 12px; right: 12px;
+    width: 64px; height: 64px; border-radius: 50%;
+    background: linear-gradient(135deg, #6366f1, #3b82f6);
+    color: #fff; border: none; cursor: pointer;
+    box-shadow: 0 6px 24px rgba(99,102,241,0.45);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 28px; transition: transform 0.2s, box-shadow 0.2s; z-index: 10;
+}}
+#dalal-fab:hover {{ transform: scale(1.1); box-shadow: 0 8px 30px rgba(99,102,241,0.55); }}
+
+#dalal-fab-label {{
+    position: absolute; bottom: 24px; right: 84px;
+    background: #0f172a; color: #fff; padding: 8px 16px;
+    border-radius: 20px; font-size: 13px; font-weight: 600;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    pointer-events: none; white-space: nowrap; z-index: 10;
+}}
+
+#dalal-chat {{
+    position: absolute; bottom: 12px; right: 12px;
+    width: 390px; height: 520px; background: #ffffff;
+    border-radius: 20px; border: 2px solid #e2e8f0;
+    box-shadow: 0 12px 48px rgba(0,0,0,0.18);
+    display: none; flex-direction: column; overflow: hidden; z-index: 10;
+}}
+#dalal-chat.open {{ display: flex; }}
+
+#dalal-chat-header {{
+    background: linear-gradient(135deg, #6366f1, #3b82f6);
+    color: #fff; padding: 16px 20px;
+    display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
+}}
+#dalal-chat-header .hdr-left {{ display: flex; align-items: center; gap: 10px; }}
+#dalal-chat-header .hdr-left .avatar {{
+    width: 36px; height: 36px; background: rgba(255,255,255,0.2);
+    border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px;
+}}
+#dalal-chat-header .hdr-title {{ font-size: 16px; font-weight: 700; }}
+#dalal-chat-header .hdr-sub {{ font-size: 11px; opacity: 0.85; }}
+#dalal-chat-close {{
+    background: rgba(255,255,255,0.2); border: none; color: #fff;
+    width: 32px; height: 32px; border-radius: 50%; cursor: pointer;
+    font-size: 18px; display: flex; align-items: center; justify-content: center;
+}}
+#dalal-chat-close:hover {{ background: rgba(255,255,255,0.35); }}
+
+#dalal-chat-body {{
+    flex: 1; overflow-y: auto; padding: 16px;
+    display: flex; flex-direction: column; gap: 12px; background: #f8fafc;
+}}
+
+.msg-row {{ display: flex; gap: 8px; max-width: 88%; }}
+.msg-row.user {{ align-self: flex-end; flex-direction: row-reverse; }}
+.msg-row.bot {{ align-self: flex-start; }}
+.msg-bubble {{
+    padding: 10px 16px; border-radius: 16px;
+    font-size: 14px; line-height: 1.55; word-wrap: break-word;
+}}
+.msg-row.user .msg-bubble {{
+    background: linear-gradient(135deg, #6366f1, #3b82f6);
+    color: #fff; border-bottom-right-radius: 4px;
+}}
+.msg-row.bot .msg-bubble {{
+    background: #ffffff; color: #0f172a;
+    border: 1px solid #e2e8f0; border-bottom-left-radius: 4px;
+}}
+.msg-time {{ font-size: 10px; color: #94a3b8; margin-top: 4px; text-align: right; }}
+.msg-row.bot .msg-time {{ text-align: left; }}
+
+.typing-dots {{ display: inline-flex; gap: 4px; padding: 12px 16px; }}
+.typing-dots span {{
+    width: 8px; height: 8px; border-radius: 50%; background: #94a3b8;
+    animation: bounce 1.4s infinite ease-in-out;
+}}
+.typing-dots span:nth-child(2) {{ animation-delay: 0.2s; }}
+.typing-dots span:nth-child(3) {{ animation-delay: 0.4s; }}
+@keyframes bounce {{ 0%,80%,100% {{ transform: scale(0); }} 40% {{ transform: scale(1); }} }}
+
+#dalal-chat-footer {{
+    padding: 12px 16px; border-top: 1px solid #e2e8f0;
+    display: flex; gap: 8px; background: #fff; flex-shrink: 0;
+}}
+#dalal-chat-input {{
+    flex: 1; border: 1.5px solid #e2e8f0; border-radius: 24px;
+    padding: 10px 18px; font-size: 14px; font-family: 'Inter', sans-serif;
+    outline: none; color: #0f172a;
+}}
+#dalal-chat-input:focus {{ border-color: #6366f1; }}
+#dalal-chat-send {{
+    width: 40px; height: 40px; border-radius: 50%;
+    background: linear-gradient(135deg, #6366f1, #3b82f6);
+    border: none; color: #fff; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; flex-shrink: 0;
+}}
+#dalal-chat-send:hover {{ transform: scale(1.08); }}
+</style>
+
+<div id="dalal-fab-label">Ask DalalAI</div>
+<button id="dalal-fab" onclick="toggleChat()">\U0001f4ac</button>
+
+<div id="dalal-chat">
+    <div id="dalal-chat-header">
+        <div class="hdr-left">
+            <div class="avatar">\U0001f916</div>
+            <div>
+                <div class="hdr-title">DalalAI</div>
+                <div class="hdr-sub">Financial Advisor Agent</div>
+            </div>
+        </div>
+        <button id="dalal-chat-close" onclick="toggleChat()">&times;</button>
+    </div>
+    <div id="dalal-chat-body">
+        <div class="msg-row bot">
+            <div>
+                <div class="msg-bubble">Hi! I'm DalalAI \U0001f44b Ask me anything about your portfolio, stocks, mutual funds, or markets.</div>
+            </div>
+        </div>
+    </div>
+    <div id="dalal-chat-footer">
+        <input id="dalal-chat-input" type="text" placeholder="Type your question..." onkeydown="if(event.key==='Enter')sendMsg()" />
+        <button id="dalal-chat-send" onclick="sendMsg()">&#10148;</button>
+    </div>
+</div>
+
+<script>
+const frame = window.frameElement;
+function resizeFrame(wide) {{
+    if (!frame) return;
+    if (wide) {{
+        frame.style.cssText = 'position:fixed!important;bottom:0!important;right:0!important;z-index:99999!important;width:420px!important;height:560px!important;border:none!important;background:transparent!important;';
+    }} else {{
+        frame.style.cssText = 'position:fixed!important;bottom:0!important;right:0!important;z-index:99999!important;width:200px!important;height:100px!important;border:none!important;background:transparent!important;';
+    }}
+}}
+resizeFrame(false);
+
+const API_URL = "{API_BASE_URL}";
+const PORTFOLIO_ID = "{selected_id}";
+let chatHistory = [];
+let chatOpen = false;
+
+function toggleChat() {{
+    chatOpen = !chatOpen;
+    resizeFrame(chatOpen);
+    document.getElementById('dalal-chat').classList.toggle('open', chatOpen);
+    document.getElementById('dalal-fab').style.display = chatOpen ? 'none' : 'flex';
+    document.getElementById('dalal-fab-label').style.display = chatOpen ? 'none' : 'block';
+    if (chatOpen) document.getElementById('dalal-chat-input').focus();
+}}
+
+function getTime() {{
+    return new Date().toLocaleTimeString([], {{hour: '2-digit', minute:'2-digit'}});
+}}
+
+function appendMsg(role, text) {{
+    const body = document.getElementById('dalal-chat-body');
+    const row = document.createElement('div');
+    row.className = 'msg-row ' + role;
+    row.innerHTML = '<div><div class="msg-bubble">' + text.replace(/\\n/g,'<br>') + '</div><div class="msg-time">' + getTime() + '</div></div>';
+    body.appendChild(row);
+    body.scrollTop = body.scrollHeight;
+}}
+
+function showTyping() {{
+    const body = document.getElementById('dalal-chat-body');
+    const row = document.createElement('div');
+    row.className = 'msg-row bot';
+    row.id = 'typing-indicator';
+    row.innerHTML = '<div><div class="msg-bubble"><div class="typing-dots"><span></span><span></span><span></span></div></div></div>';
+    body.appendChild(row);
+    body.scrollTop = body.scrollHeight;
+}}
+
+function removeTyping() {{
+    const el = document.getElementById('typing-indicator');
+    if (el) el.remove();
+}}
+
+async function sendMsg() {{
+    const input = document.getElementById('dalal-chat-input');
+    const text = input.value.trim();
+    if (!text) return;
+    input.value = '';
+    appendMsg('user', text);
+    chatHistory.push({{role: 'user', content: text}});
+    showTyping();
+    try {{
+        const res = await fetch(API_URL + '/chat', {{
+            method: 'POST',
+            headers: {{'Content-Type': 'application/json'}},
+            body: JSON.stringify({{
+                message: text,
+                portfolio_id: PORTFOLIO_ID,
+                chat_history: chatHistory.slice(-10)
+            }})
+        }});
+        const data = await res.json();
+        removeTyping();
+        const reply = data.reply || 'Sorry, something went wrong.';
+        appendMsg('bot', reply);
+        chatHistory.push({{role: 'assistant', content: reply}});
+    }} catch (e) {{
+        removeTyping();
+        appendMsg('bot', 'Could not connect to DalalAI server. Make sure server.py is running.');
+    }}
+}}
+</script>
+"""
+
+components.html(chat_widget_html, height=600, scrolling=False)
