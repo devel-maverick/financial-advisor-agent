@@ -871,7 +871,7 @@ html, body {{
 #dalal-fab, #dalal-fab-label, #dalal-chat {{ pointer-events: auto; }}
 
 #dalal-fab {{
-    position: absolute; bottom: 12px; right: 12px;
+    position: absolute; bottom: 12px; left: 12px;
     width: 64px; height: 64px; border-radius: 50%;
     background: linear-gradient(135deg, #6366f1, #3b82f6);
     color: #fff; border: none; cursor: pointer;
@@ -882,7 +882,7 @@ html, body {{
 #dalal-fab:hover {{ transform: scale(1.1); box-shadow: 0 8px 30px rgba(99,102,241,0.55); }}
 
 #dalal-fab-label {{
-    position: absolute; bottom: 24px; right: 84px;
+    position: absolute; bottom: 24px; left: 84px;
     background: #0f172a; color: #fff; padding: 8px 16px;
     border-radius: 20px; font-size: 13px; font-weight: 600;
     box-shadow: 0 4px 12px rgba(0,0,0,0.15);
@@ -890,7 +890,7 @@ html, body {{
 }}
 
 #dalal-chat {{
-    position: absolute; bottom: 12px; right: 12px;
+    position: absolute; bottom: 12px; left: 12px;
     width: 390px; height: 520px; background: #ffffff;
     border-radius: 20px; border: 2px solid #e2e8f0;
     box-shadow: 0 12px 48px rgba(0,0,0,0.18);
@@ -1001,9 +1001,9 @@ const frame = window.frameElement;
 function resizeFrame(wide) {{
     if (!frame) return;
     if (wide) {{
-        frame.style.cssText = 'position:fixed!important;bottom:0!important;right:0!important;z-index:99999!important;width:420px!important;height:560px!important;border:none!important;background:transparent!important;';
+        frame.style.cssText = 'position:fixed!important;bottom:0!important;left:0!important;z-index:99999!important;width:420px!important;height:560px!important;border:none!important;background:transparent!important;';
     }} else {{
-        frame.style.cssText = 'position:fixed!important;bottom:0!important;right:0!important;z-index:99999!important;width:200px!important;height:100px!important;border:none!important;background:transparent!important;';
+        frame.style.cssText = 'position:fixed!important;bottom:0!important;left:0!important;z-index:99999!important;width:200px!important;height:100px!important;border:none!important;background:transparent!important;';
     }}
 }}
 resizeFrame(false);
