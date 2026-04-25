@@ -21,6 +21,7 @@ DalalAI solves this by looking at news, sector trends, and stock prices to give 
 - **Market Context**: Shows how the overall market (NIFTY 50, SENSEX) and big investors (FII/DII) are behaving.
 - **Self-Checking**: The AI checks its own work to make sure the analysis is accurate before showing it to you.
 - **Clean Dashboard**: A simple web interface to see all your data and the AI's reasoning in one place.
+- **Chat with DalalAI**: Ask any question about finance, markets, stocks, mutual funds, or your specific portfolio — the AI responds with context-aware answers.
 
 ---
 
@@ -137,6 +138,7 @@ streamlit run app.py
 | :--- | :--- | :--- |
 | `/portfolio/{id}` | `GET` | Gets portfolio and market data. |
 | `/analyze` | `POST` | Asks the AI to analyze the portfolio. |
+| `/chat` | `POST` | Chat with DalalAI about finance or your portfolio. |
 | `/health` | `GET` | Checks if the server is running. |
 
 ---
