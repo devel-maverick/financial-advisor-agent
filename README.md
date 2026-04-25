@@ -82,10 +82,12 @@ streamlit run app.py
 ## 📸 Screenshots
 
 ### Dashboard Overview
-![Dashboard Placeholder](image.png)
+
+<img width="1511" height="800" alt="Screenshot 2026-04-25 at 4 23 08 PM" src="https://github.com/user-attachments/assets/ec3a48ec-8cae-4a4a-93de-0d601be87e25" />
 
 ### AI Reasoning & Causal Chain
-![Reasoning Placeholder](image2.png)
+<img width="1320" height="338" alt="Screenshot 2026-04-25 at 4 23 26 PM" src="https://github.com/user-attachments/assets/1c48dfe7-f418-4ed2-b775-3215720f53cd" />
+
 
 ---
 
