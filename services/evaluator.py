@@ -74,8 +74,9 @@ def evaluate_response(response: dict):
         llm_score = int(llm_score)
     except:
         llm_score = 0
-    
-    mixed_score = int((score + llm_score) / 2) if llm_score > 0 else score
+
+    # Rule-based gets 70% weight, LLM self-score gets 30% Because we belive that rule based evalution is more reliable than llm(llm can give more score to its own response)
+    mixed_score = int((score * 0.7) + (llm_score * 0.3))
     
     if mixed_score >= 80:
         grade = "EXCELLENT"
