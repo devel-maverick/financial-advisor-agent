@@ -22,3 +22,5 @@ class DataLoader:
         return self.load("historical_data.json")
     def get_sector_data(self):
         return self.load("sector_mapping.json")
+    def get_mutual_funds_data(self):
+        return self.load("mutual_funds.json").get("mutual_funds", {})

@@ -56,6 +56,15 @@ def build_context(analytics, market, sectors, news, historical):
             case3.append(f"{n.get('headline','')} (score {score:+.2f}) — unclear news — ambiguous signal with mixed positive and negative factors")
     case3_lines = "\n".join(case3) or "None detected"
 
+    # Simple MF breakdown for prompt
+    mf_text = []
+    for mf in analytics.get("mf_breakdown", []):
+        stocks_str = ", ".join(mf["top_stocks"]) or "N/A"
+        sectors_str = ", ".join(f"{s}:{w}%" for s,w in mf["top_sectors"]) or "N/A"
+        overlap = ", ".join(mf["overlap_with_stocks"]) or "None"
+        mf_text.append(f"{mf['name']} ({mf['category']}): NAV {mf['nav_change']:+.2f}% | Weight: {mf['weight']}% | Stocks: {stocks_str} | Sectors: {sectors_str} | Overlap with direct: {overlap}")
+    mf_section = "\n    ".join(mf_text) if mf_text else "No MFs"
+
     context = f"""
     === PORTFOLIO ===
     Value: ₹{analytics['total_current_value']}
@@ -79,6 +88,9 @@ def build_context(analytics, market, sectors, news, historical):
 
     === RISKS ===
     {analytics['risks']}
+
+    === MUTUAL FUND BREAKDOWN ===
+    {mf_section}
 
     === EDGECASE1: Positive News + Negative Price ===
     {case1_lines}
@@ -126,6 +138,7 @@ def build_context(analytics, market, sectors, news, historical):
         14. If any news has a sentiment score close to zero, treat it as ambiguous — acknowledge both sides briefly and avoid leaning positive or negative without evidence.
         15. If any single sector has >40% exposure, you MUST explicitly flag this as a "Concentration Risk" in the Key Risk section.
         16. Use the HISTORICAL TRENDS to contextualize today's movement. For example, if the market has been bearish for 7 days, today's fall might be a continuation of a trend rather than a one-off event.
+        17. For MUTUAL FUNDS: explain their movement via underlying stocks and sectors. If MF stocks overlap with direct holdings, flag the compounded exposure.
         
         # OUTPUT FORMAT:
         You MUST respond in strict JSON format with these exact keys:

@@ -52,6 +52,28 @@ class PortfolioAnalytics:
             "stocks":round(assets_total_current/total_current_value*100,2),
             "mutual_funds":round(mf_total_current/total_current_value*100,2),
         }
+
+        #PostDeadline: Break down each MF into its underlying stocks and sectors
+        mf_details = self.loader.get_mutual_funds_data()
+        direct_symbols = {s["symbol"] for s in stocks}
+        mf_breakdown = []
+        for mf in mutual_funds:
+            info = mf_details.get(mf.get("scheme_code",""), {})
+            holdings = info.get("top_holdings", [])
+            sectors = info.get("sector_allocation", {})
+            # Here we extract the top holdings and sectors from the MF data
+            overlap = [h["stock"] for h in holdings if h.get("stock") in direct_symbols]
+            mf_breakdown.append({
+                "name": mf.get("scheme_name",""),
+                "category": info.get("category", mf.get("category","")),
+                "nav_change": info.get("nav_change_percent", mf.get("day_change_percent",0)),
+                "weight": mf.get("weight_in_portfolio",0),
+                "top_stocks": [h.get("stock","") for h in holdings[:5] if h.get("stock")],
+                "top_sectors": sorted(sectors.items(), key=lambda x:-x[1])[:3],
+                "overlap_with_stocks": overlap,
+            })
+        
+
         return {
             "portfolio_id":portfolio_id,
             "user_name":portfolio["user_name"],
@@ -69,9 +91,7 @@ class PortfolioAnalytics:
             "top_losers": [{"symbol": s["symbol"], "change_pct": s["day_change_percent"]} for s in worst_scorer_stocks],
             "asset_breakdown":asset_breakdown,
             "stocks":stocks,
-            "mutual_funds":mutual_funds
+            "mutual_funds":mutual_funds,
+            "mf_breakdown":mf_breakdown
         }
-
-
-#Mutual funds have diversified exposure, so without decomposing their holdings, it’s difficult to attribute performance to a specific sector or event.
         
